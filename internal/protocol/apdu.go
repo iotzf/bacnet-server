@@ -219,3 +219,34 @@ func (a *APDU) String() string {
 	sb.WriteString("}")
 	return sb.String()
 }
+
+func (a *APDU) ServiceName() string {
+	serviceName := "未知"
+	switch *a.ServiceChoice {
+	case BACnetServiceConfirmedReadProperty:
+		serviceName = "ReadProperty"
+	case BACnetServiceConfirmedWriteProperty:
+		serviceName = "WriteProperty"
+	case BACnetServiceConfirmedReadPropertyMultiple:
+		serviceName = "ReadPropertyMultiple"
+	case BACnetServiceConfirmedWritePropertyMultiple:
+		serviceName = "WritePropertyMultiple"
+	case BACnetServiceConfirmedAcknowledgeAlarm:
+		serviceName = "AcknowledgeAlarm"
+	case BACnetServiceConfirmedAtomicReadFile:
+		serviceName = "AtomicReadFile"
+	case BACnetServiceConfirmedAtomicWriteFile:
+		serviceName = "AtomicWriteFile"
+	case BACnetServiceConfirmedDeleteFile:
+		serviceName = "DeleteFile"
+	case BACnetServiceConfirmedSubscribeCOV:
+		serviceName = "SubscribeCOV"
+	case BACnetServiceConfirmedSubscribeCOVProperty:
+		serviceName = "SubscribeCOVProperty"
+	case BACnetServiceConfirmedCancelCOVSubscription:
+		serviceName = "CancelCOVSubscription"
+	default:
+		serviceName = fmt.Sprintf("未知服务(0x%02x)", *a.ServiceChoice)
+	}
+	return serviceName
+}

@@ -521,26 +521,357 @@ func (s *BACnetServer) handleBACnetAPDU(data []byte) ([]byte, error) {
 			return nil, fmt.Errorf("Unsupported unconfirmed service type: 0x%02x\n", *apdu.ServiceChoice)
 		}
 	case BACnetAPDUTypeSimpleAck:
-		// SimpleAck: 一般只需要记录或简单响应（服务器可按需实现）
-		fmt.Println("Received SimpleAck")
+		// 按照BACnet协议规范处理SimpleAck
+		// SimpleAck用于确认接收到确认服务请求并成功处理
+		invokeID := "未知"
+		serviceName := "未知"
+
+		if apdu.InvokeID != nil {
+			invokeID = fmt.Sprintf("0x%02x", *apdu.InvokeID)
+		}
+
+		if apdu.ServiceChoice != nil {
+			serviceName = apdu.ServiceName()
+		}
+
+		// 记录SimpleAck信息，符合BACnet协议规范的处理
+		fmt.Printf("收到SimpleAck: 服务=%s, InvokeID=%s\n", serviceName, invokeID)
+
+		// 根据BACnet协议，服务器接收到SimpleAck通常不需要回复
 		return nil, nil
 	case BACnetAPDUTypeComplexAck:
-		fmt.Println("Received ComplexAck")
-		// 如需进一步解析可在此处实现
+		// 按照BACnet协议规范处理ComplexAck APDU
+		// ComplexAck用于确认服务请求并提供复杂的响应数据
+		invokeID := "未知"
+		serviceName := "未知"
+		segmented := "否"
+		moreFollows := "否"
+		sequenceNumber := 0
+		proposedWindowSize := 0
+		payloadSize := len(apdu.Payload)
+
+		// 获取InvokeID（请求标识）
+		if apdu.InvokeID != nil {
+			invokeID = fmt.Sprintf("0x%02x", *apdu.InvokeID)
+		}
+
+		// 获取控制标志信息
+		// 解析分段控制标志
+		if (apdu.ControlFlags)&0x01 == 0x01 {
+			segmented = "是"
+		}
+		if (apdu.ControlFlags)&0x02 == 0x02 {
+			moreFollows = "是"
+		}
+
+		// 获取服务名称
+		if apdu.ServiceChoice != nil {
+			serviceName = apdu.ServiceName()
+		}
+
+		// 解析分段信息（如果适用）
+		if segmented == "是" && len(apdu.Payload) >= 2 {
+			sequenceNumber = int(apdu.Payload[0])
+			proposedWindowSize = int(apdu.Payload[1])
+			// 记录分段信息
+			fmt.Printf("收到ComplexAck APDU: 服务=%s, InvokeID=%s, 分段=%s, 更多跟随=%s, 序列号=%d, 提议窗口大小=%d, 有效载荷大小=%d字节\n",
+				serviceName, invokeID, segmented, moreFollows, sequenceNumber, proposedWindowSize, payloadSize)
+		} else {
+			// 非分段ComplexAck
+			fmt.Printf("收到ComplexAck APDU: 服务=%s, InvokeID=%s, 分段=%s, 有效载荷大小=%d字节\n",
+				serviceName, invokeID, segmented, payloadSize)
+		}
+
+		// 根据BACnet协议，服务器收到ComplexAck通常不需要回复
 		return nil, nil
 	case BACnetAPDUTypeSegmentAck:
-		fmt.Println("Received SegmentAck")
-		// 分段场景的处理（未实现）
+		// 按照BACnet协议规范处理SegmentAck APDU
+		// SegmentAck用于在分段传输场景中确认收到的数据段
+		invokeID := "未知"
+		sequenceNumber := 0
+		proposedWindowSize := 0
+		neglectStart := "否"
+		fragmented := "否"
+		serverInitiated := "否"
+
+		// 获取InvokeID（请求标识）
+		if apdu.InvokeID != nil {
+			invokeID = fmt.Sprintf("0x%02x", *apdu.InvokeID)
+		}
+
+		// 解析控制标志
+		// 第一位表示Neglect Start
+		if (apdu.ControlFlags)&0x08 == 0x08 {
+			neglectStart = "是"
+		}
+		// 第二位表示Fragmented
+		if (apdu.ControlFlags)&0x04 == 0x04 {
+			fragmented = "是"
+		}
+		// 第四位表示Server Initiated
+		if (apdu.ControlFlags)&0x01 == 0x01 {
+			serverInitiated = "是"
+		}
+
+		// 解析序列号和提议窗口大小（BACnet协议规定在payload中）
+		if len(apdu.Payload) >= 2 {
+			sequenceNumber = int(apdu.Payload[0])
+			proposedWindowSize = int(apdu.Payload[1])
+		}
+
+		// 记录SegmentAck信息，符合BACnet协议规范的处理
+		fmt.Printf("收到SegmentAck APDU: InvokeID=%s, 序列号=%d, 提议窗口大小=%d, 忽略开始=%s, 分段=%s, 服务器发起=%s\n",
+			invokeID, sequenceNumber, proposedWindowSize, neglectStart, fragmented, serverInitiated)
+
+		// 根据BACnet协议，服务器收到SegmentAck后通常不需要回复
 		return nil, nil
 	case BACnetAPDUTypeError:
-		fmt.Println("Received Error APDU")
-		// 错误处理（可解析 error class/code）
+		// 按照BACnet协议规范处理Error APDU
+		// Error用于指示服务请求已被拒绝，并提供错误详情
+		errorClass := "未知"
+		errorCode := "未知"
+		invokeID := "未知"
+		serviceName := "未知"
+		classCode := uint8(0)
+		code := uint8(0)
+
+		// 获取InvokeID（如果存在）
+		if apdu.InvokeID != nil {
+			invokeID = fmt.Sprintf("0x%02x", *apdu.InvokeID)
+		}
+
+		// 获取服务名称（如果存在）
+		if apdu.ServiceChoice != nil {
+			serviceName = apdu.ServiceName()
+		}
+
+		// 解析错误类别和错误代码（BACnet协议规定在payload中）
+		if len(apdu.Payload) >= 2 {
+			classCode = apdu.Payload[0]
+			code = apdu.Payload[1]
+
+			// 解析错误类别
+			switch classCode {
+			case ErrorClassDevice:
+				errorClass = "设备错误"
+				// 设备错误子类解析
+				switch code {
+				case 0:
+					errorCode = "设备忙"
+				case 1:
+					errorCode = "无内存"
+				case 2:
+					errorCode = "资源不可用"
+				default:
+					errorCode = fmt.Sprintf("未知设备错误(0x%02x)", code)
+				}
+			case ErrorClassObject:
+				errorClass = "对象错误"
+				// 对象错误子类解析
+				switch code {
+				case ErrorCodeObjectNotExist:
+					errorCode = "对象不存在"
+				case ErrorCodeObjectNotOfRequiredType:
+					errorCode = "对象类型不正确"
+				default:
+					errorCode = fmt.Sprintf("未知对象错误(0x%02x)", code)
+				}
+			case ErrorClassProperty:
+				errorClass = "属性错误"
+				// 属性错误子类解析
+				switch code {
+				case ErrorCodePropertyNotExist:
+					errorCode = "属性不存在"
+				case ErrorCodePropertyNotReadable:
+					errorCode = "属性不可读"
+				case ErrorCodePropertyNotWritable:
+					errorCode = "属性不可写"
+				case ErrorCodeValueOutOfRange:
+					errorCode = "值超出范围"
+				default:
+					errorCode = fmt.Sprintf("未知属性错误(0x%02x)", code)
+				}
+			case ErrorClassService:
+				errorClass = "服务错误"
+				// 服务错误子类解析
+				switch code {
+				case 0:
+					errorCode = "服务请求被拒绝"
+				case 1:
+					errorCode = "服务未实现"
+				case 2:
+					errorCode = "服务不可用"
+				case ErrorCodeInvalidParameterDataType:
+					errorCode = "参数数据类型无效"
+				default:
+					errorCode = fmt.Sprintf("未知服务错误(0x%02x)", code)
+				}
+			case ErrorClassCov:
+				errorClass = "COV错误"
+				// COV错误子类解析
+				switch code {
+				case ErrorCodeCovObject:
+					errorCode = "COV对象错误"
+				case ErrorCodeCovProperty:
+					errorCode = "COV属性错误"
+				case ErrorCodeCovInvalidTime:
+					errorCode = "COV无效时间"
+				default:
+					errorCode = fmt.Sprintf("未知COV错误(0x%02x)", code)
+				}
+			case ErrorClassFile:
+				errorClass = "文件错误"
+				// 文件错误子类解析
+				switch code {
+				case ErrorCodeFileAccessDenied:
+					errorCode = "文件访问被拒绝"
+				case ErrorCodeFileNotFound:
+					errorCode = "文件未找到"
+				case ErrorCodeFileAlreadyExists:
+					errorCode = "文件已存在"
+				case ErrorCodeFileTooLarge:
+					errorCode = "文件太大"
+				case ErrorCodeFileDirectory:
+					errorCode = "文件目录"
+				case ErrorCodeFileNotDirectory:
+					errorCode = "不是文件目录"
+				case ErrorCodeFileReadFault:
+					errorCode = "文件读取错误"
+				case ErrorCodeFileWriteFault:
+					errorCode = "文件写入错误"
+				default:
+					errorCode = fmt.Sprintf("未知文件错误(0x%02x)", code)
+				}
+			default:
+				errorClass = fmt.Sprintf("未知错误类别(0x%02x)", classCode)
+				errorCode = fmt.Sprintf("未知错误代码(0x%02x)", code)
+			}
+		}
+
+		// 记录Error信息，符合BACnet协议规范的处理
+		fmt.Printf("收到Error APDU: 服务=%s, InvokeID=%s, 错误类别=0x%02x(%s), 错误代码=0x%02x(%s)\n",
+			serviceName, invokeID, classCode, errorClass, code, errorCode)
+
+		// 根据BACnet协议，服务器接收到Error通常不需要回复
 		return nil, nil
 	case BACnetAPDUTypeReject:
-		fmt.Println("Received Reject APDU")
+		// 按照BACnet协议规范处理Reject APDU
+		// Reject用于指示请求因格式或语义错误而被拒绝
+		rejectReason := "未知"
+		reasonCode := uint8(0)
+		invokeID := "未知"
+
+		// 获取InvokeID（如果存在）
+		if apdu.InvokeID != nil {
+			invokeID = fmt.Sprintf("0x%02x", *apdu.InvokeID)
+		}
+
+		// 解析拒绝原因代码（BACnet协议规定在InvokeID后面的字节）
+		if len(apdu.Payload) > 0 {
+			reasonCode = apdu.Payload[0]
+			// 根据BACnet协议定义的拒绝原因代码解释
+			switch reasonCode {
+			case 0:
+				rejectReason = "其他原因"
+			case 1:
+				rejectReason = "缓冲区溢出"
+			case 2:
+				rejectReason = "无效应用标签"
+			case 3:
+				rejectReason = "无效标签类型"
+			case 4:
+				rejectReason = "标签长度值无效"
+			case 5:
+				rejectReason = "请求的缓冲区太大"
+			case 6:
+				rejectReason = "分段消息不完整"
+			case 7:
+				rejectReason = "服务请求参数数量无效"
+			case 8:
+				rejectReason = "服务请求参数类型无效"
+			case 9:
+				rejectReason = "服务请求参数值无效"
+			case 10:
+				rejectReason = "确认服务请求服务选择器无效"
+			case 11:
+				rejectReason = "确认服务请求缓冲区太大"
+			default:
+				rejectReason = fmt.Sprintf("未知拒绝原因(0x%02x)", reasonCode)
+			}
+		}
+
+		// 记录Reject信息，符合BACnet协议规范的处理
+		fmt.Printf("收到Reject APDU: InvokeID=%s, 拒绝原因代码=0x%02x, 原因=%s\n",
+			invokeID, reasonCode, rejectReason)
+
+		// 根据BACnet协议，服务器接收到Reject通常不需要回复
 		return nil, nil
 	case BACnetAPDUTypeAbort:
-		fmt.Println("Received Abort APDU")
+		// 按照BACnet协议规范处理Abort APDU
+		// Abort用于指示通信会话被意外终止
+		abortReason := "未知"
+		reasonCode := uint8(0)
+		invokeID := "未知"
+		isServer := false
+
+		// 获取InvokeID（如果存在）
+		if apdu.InvokeID != nil {
+			invokeID = fmt.Sprintf("0x%02x", *apdu.InvokeID)
+		}
+
+		// 解析控制标志中的服务器发起标志
+		if (apdu.ControlFlags & 0x01) != 0 {
+			isServer = true
+		}
+
+		// 解析放弃原因代码（BACnet协议规定在适当位置）
+		if len(apdu.Payload) > 0 {
+			reasonCode = apdu.Payload[0]
+			// 根据BACnet协议定义的放弃原因代码解释
+			switch reasonCode {
+			case 0:
+				abortReason = "其他原因"
+			case 1:
+				abortReason = "缓冲区溢出"
+			case 2:
+				abortReason = "非预期的PDU类型"
+			case 3:
+				abortReason = "非预期的InvokeID"
+			case 4:
+				abortReason = "未确认的服务请求"
+			case 5:
+				abortReason = "超时"
+			case 6:
+				abortReason = "处理错误"
+			case 7:
+				abortReason = "服务器已停止"
+			case 8:
+				abortReason = "无效的参数数据类型"
+			case 9:
+				abortReason = "无效的参数值"
+			case 10:
+				abortReason = "设备忙"
+			case 11:
+				abortReason = "服务器资源不足"
+			default:
+				abortReason = fmt.Sprintf("未知放弃原因(0x%02x)", reasonCode)
+			}
+		}
+
+		// 记录Abort信息，符合BACnet协议规范的处理
+		fmt.Printf("收到Abort APDU: InvokeID=%s, 发起方=%s, 放弃原因代码=0x%02x, 原因=%s\n",
+			invokeID,
+			func() string {
+				if isServer {
+					return "服务器"
+				} else {
+					return "客户端"
+				}
+			}(),
+			reasonCode,
+			abortReason)
+
+		// 根据BACnet协议，服务器接收到Abort通常不需要回复
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("Unhandled APDU: % x\n", data)
