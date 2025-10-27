@@ -397,42 +397,21 @@ func (s *BACnetServer) processBACnetMessage(data []byte) ([]byte, error) {
 
 // handleOriginalUDPMessage 处理原始UDP消息
 func (s *BACnetServer) handleOriginalUDPMessage(data []byte) ([]byte, error) {
-	// 这里应该解析BACnet NPDU和APDU
-	// 简化版本只处理基本的Who-Is请求
-	return s.handleBACnetAPDU(data)
+	_, offset, err := ParseNPDU(data)
+	if err != nil {
+		return nil, err
+	}
+	return s.handleBACnetAPDU(data[offset:])
 }
 
 // handleBroadcastMessage 处理广播消息
 func (s *BACnetServer) handleBroadcastMessage(data []byte) ([]byte, error) {
-	// 处理广播消息，如Who-Is
-	return s.handleBACnetAPDU(data)
+	_, offset, err := ParseNPDU(data)
+	if err != nil {
+		return nil, err
+	}
+	return s.handleBACnetAPDU(data[offset:])
 }
-
-// BACnet服务类型常量
-const (
-	BACnetServiceUnconfirmedWhoIs               = 0x08
-	BACnetServiceConfirmedReadProperty          = 0x0c
-	BACnetServiceConfirmedWriteProperty         = 0x0d
-	BACnetServiceConfirmedReadPropertyMultiple  = 0x10
-	BACnetServiceConfirmedWritePropertyMultiple = 0x11
-	BACnetServiceConfirmedAcknowledgeAlarm      = 0x0f
-	BACnetServiceUnconfirmedEventNotification   = 0x09
-	BACnetServiceConfirmedAtomicReadFile        = 0x14
-	BACnetServiceConfirmedAtomicWriteFile       = 0x15
-	BACnetServiceConfirmedDeleteFile            = 0x16
-	BACnetServiceConfirmedSubscribeCOV          = 0x0e
-	BACnetServiceConfirmedSubscribeCOVProperty  = 0x48
-	BACnetServiceConfirmedCancelCOVSubscription = 0x25
-)
-
-// APDU类型常量
-const (
-	BACnetAPDUTypeUnconfirmedServiceRequest = 0x05
-	BACnetAPDUTypeConfirmedServiceRequest   = 0x01
-	BACnetAPDUTypeSimpleAck                 = 0x02
-	BACnetAPDUTypeError                     = 0x03
-	BACnetAPDUTypeComplexAck                = 0x04
-)
 
 // 错误类型常量
 const (
@@ -475,59 +454,59 @@ func (s *BACnetServer) handleBACnetAPDU(data []byte) ([]byte, error) {
 	}
 
 	// 获取APDU类型
-	apduType := data[0] & 0xf0
+	apdu, err := ParseAPDU(data)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("apdu type: %s\n", apdu.String())
 
-	switch apduType {
+	switch apdu.PDUType {
 	case BACnetAPDUTypeUnconfirmedServiceRequest:
 		// 处理非确认服务请求，如Who-Is
-		if len(data) > 3 && data[3] == BACnetServiceUnconfirmedWhoIs {
+		if *apdu.ServiceChoice == BACnetServiceUnconfirmedWhoIs {
 			fmt.Println("Received Who-Is request")
 			return s.createIAmResponse(), nil
 		}
 
 	case BACnetAPDUTypeConfirmedServiceRequest:
 		// 处理确认服务请求
-		if len(data) > 7 {
-			serviceType := data[7]
-			invokeID := data[2]
-
-			switch serviceType {
-			case BACnetServiceConfirmedReadProperty:
-				fmt.Println("Received ReadProperty request")
-				return s.handleReadProperty(data[8:], invokeID)
-			case BACnetServiceConfirmedWriteProperty:
-				fmt.Println("Received WriteProperty request")
-				return s.handleWriteProperty(data[8:], invokeID)
-			case BACnetServiceConfirmedReadPropertyMultiple:
-				fmt.Println("Received ReadPropertyMultiple request")
-				return s.handleReadPropertyMultiple(data[8:], invokeID)
-			case BACnetServiceConfirmedWritePropertyMultiple:
-				fmt.Println("Received WritePropertyMultiple request")
-				return s.handleWritePropertyMultiple(data[8:], invokeID)
-			case BACnetServiceConfirmedAcknowledgeAlarm:
-				fmt.Println("Received AcknowledgeAlarm request")
-				return s.handleAcknowledgeAlarm(data[8:], invokeID)
-			case BACnetServiceConfirmedAtomicReadFile:
-				fmt.Println("Received AtomicReadFile request")
-				return s.handleAtomicReadFile(data[8:], invokeID)
-			case BACnetServiceConfirmedAtomicWriteFile:
-				fmt.Println("Received AtomicWriteFile request")
-				return s.handleAtomicWriteFile(data[8:], invokeID)
-			case BACnetServiceConfirmedDeleteFile:
-				fmt.Println("Received DeleteFile request")
-				return s.handleDeleteFile(data[8:], invokeID)
-			case BACnetServiceConfirmedSubscribeCOV:
-				fmt.Println("Received SubscribeCOV request")
-				return s.handleSubscribeCOV(data[8:], invokeID)
-			case BACnetServiceConfirmedSubscribeCOVProperty:
-				fmt.Println("Received SubscribeCOVProperty request")
-				return s.handleSubscribeCOVProperty(data[8:], invokeID)
-			case BACnetServiceConfirmedCancelCOVSubscription:
-				fmt.Println("Received CancelCOVSubscription request")
-				return s.handleCancelCOVSubscription(data[8:], invokeID)
-			default:
-				fmt.Printf("Unsupported service type: %02x\n", serviceType)
-			}
+		invokeID := *apdu.InvokeID
+		switch *apdu.ServiceChoice {
+		case BACnetServiceConfirmedReadProperty:
+			fmt.Println("Received ReadProperty request")
+			return s.handleReadProperty(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedWriteProperty:
+			fmt.Println("Received WriteProperty request")
+			return s.handleWriteProperty(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedReadPropertyMultiple:
+			fmt.Println("Received ReadPropertyMultiple request")
+			return s.handleReadPropertyMultiple(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedWritePropertyMultiple:
+			fmt.Println("Received WritePropertyMultiple request")
+			return s.handleWritePropertyMultiple(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedAcknowledgeAlarm:
+			fmt.Println("Received AcknowledgeAlarm request")
+			return s.handleAcknowledgeAlarm(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedAtomicReadFile:
+			fmt.Println("Received AtomicReadFile request")
+			return s.handleAtomicReadFile(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedAtomicWriteFile:
+			fmt.Println("Received AtomicWriteFile request")
+			return s.handleAtomicWriteFile(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedDeleteFile:
+			fmt.Println("Received DeleteFile request")
+			return s.handleDeleteFile(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedSubscribeCOV:
+			fmt.Println("Received SubscribeCOV request")
+			return s.handleSubscribeCOV(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedSubscribeCOVProperty:
+			fmt.Println("Received SubscribeCOVProperty request")
+			return s.handleSubscribeCOVProperty(apdu.Payload, invokeID)
+		case BACnetServiceConfirmedCancelCOVSubscription:
+			fmt.Println("Received CancelCOVSubscription request")
+			return s.handleCancelCOVSubscription(apdu.Payload, invokeID)
+		default:
+			fmt.Printf("Unsupported service type: %02x\n", *apdu.ServiceChoice)
 		}
 	}
 
