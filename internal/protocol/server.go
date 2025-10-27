@@ -460,16 +460,14 @@ func (s *BACnetServer) handleBACnetAPDU(data []byte) ([]byte, error) {
 	}
 	fmt.Printf("apdu type: %s\n", apdu.String())
 
+	// 根据APDU类型处理请求
 	switch apdu.PDUType {
-	case BACnetAPDUTypeUnconfirmedServiceRequest:
-		// 处理非确认服务请求，如Who-Is
-		if *apdu.ServiceChoice == BACnetServiceUnconfirmedWhoIs {
-			fmt.Println("Received Who-Is request")
-			return s.createIAmResponse(), nil
+	case BACnetAPDUTypeConfirmedServiceRequest:
+		// Confirmed service request 需要 invokeID 和 serviceChoice
+		if apdu.InvokeID == nil || apdu.ServiceChoice == nil {
+			return nil, fmt.Errorf("confirmed service request missing invokeID or serviceChoice")
 		}
 
-	case BACnetAPDUTypeConfirmedServiceRequest:
-		// 处理确认服务请求
 		invokeID := *apdu.InvokeID
 		switch *apdu.ServiceChoice {
 		case BACnetServiceConfirmedReadProperty:
@@ -508,9 +506,46 @@ func (s *BACnetServer) handleBACnetAPDU(data []byte) ([]byte, error) {
 		default:
 			fmt.Printf("Unsupported service type: %02x\n", *apdu.ServiceChoice)
 		}
+	case BACnetAPDUTypeUnconfirmedServiceRequest:
+		// Unconfirmed service request 可能没有 invokeID
+		if apdu.ServiceChoice == nil {
+			fmt.Println("Unconfirmed service without serviceChoice")
+			return nil, fmt.Errorf("unconfirmed service request missing serviceChoice")
+		}
+
+		switch *apdu.ServiceChoice {
+		case BACnetServiceUnconfirmedWhoIs:
+			fmt.Println("Received Who-Is request")
+			return s.createIAmResponse(), nil
+		default:
+			return nil, fmt.Errorf("Unsupported unconfirmed service type: 0x%02x\n", *apdu.ServiceChoice)
+		}
+	case BACnetAPDUTypeSimpleAck:
+		// SimpleAck: 一般只需要记录或简单响应（服务器可按需实现）
+		fmt.Println("Received SimpleAck")
+		return nil, nil
+	case BACnetAPDUTypeComplexAck:
+		fmt.Println("Received ComplexAck")
+		// 如需进一步解析可在此处实现
+		return nil, nil
+	case BACnetAPDUTypeSegmentAck:
+		fmt.Println("Received SegmentAck")
+		// 分段场景的处理（未实现）
+		return nil, nil
+	case BACnetAPDUTypeError:
+		fmt.Println("Received Error APDU")
+		// 错误处理（可解析 error class/code）
+		return nil, nil
+	case BACnetAPDUTypeReject:
+		fmt.Println("Received Reject APDU")
+		return nil, nil
+	case BACnetAPDUTypeAbort:
+		fmt.Println("Received Abort APDU")
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("Unhandled APDU: % x\n", data)
 	}
 
-	fmt.Printf("Unhandled APDU: % x\n", data)
 	return nil, nil
 }
 
