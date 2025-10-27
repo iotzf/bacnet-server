@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -370,13 +371,20 @@ func (s *BACnetServer) processBACnetMessage(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("BACnet message too short")
 	}
 
+	bvlc := data[0]
+	bvlcFunction := data[1]
+	bvlcLength := binary.BigEndian.Uint16(data[2:4])
+
 	// 检查BVLC类型 (应该是0x81表示BACnet/IP)
-	if data[0] != 0x81 {
-		return nil, fmt.Errorf("unknown BVLC type: %02x", data[0])
+	if bvlc != 0x81 {
+		return nil, fmt.Errorf("unknown BVLC type: %02x", bvlc)
+	}
+	if int(bvlcLength) != len(data) {
+		return nil, fmt.Errorf("BVLC length mismatch: expected %d, got %d", bvlcLength, len(data))
 	}
 
 	// 处理不同类型的BVLC函数
-	switch data[1] {
+	switch bvlcFunction {
 	case 0x0a: // 原始UDP消息 Original-Unicast-NPDU
 		return s.handleOriginalUDPMessage(data[4:])
 	case 0x0b: // 广播消息 Original-Broadcast-NPDU 用于向网络中的所有BACnet设备发送消息（如Who-Is请求）
