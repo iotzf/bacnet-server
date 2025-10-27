@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bacnet-server/internal/model"
-	"bacnet-server/internal/protocol"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -10,6 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/iotzf/bacnet-server/internal/model"
+	"github.com/iotzf/bacnet-server/internal/protocol"
 )
 
 // simulateDataChanges 模拟设备数据变化

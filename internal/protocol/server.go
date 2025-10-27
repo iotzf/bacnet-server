@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bacnet-server/internal/model"
 	"errors"
 	"fmt"
 	"math"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/iotzf/bacnet-server/internal/model"
 )
 
 // BACnetServer 实现BACnet服务端
