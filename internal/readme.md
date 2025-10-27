@@ -87,3 +87,58 @@ NPDU的结构设计直接决定了BACnet跨网络通信的效率和可靠性：
 
 ## apdu.PDUType
 
+
+
+
+
+          
+让我查看server.go文件中parsePropertyIdentifier函数的实现，以了解对象标识符和属性标识符的处理逻辑。
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: /Users/caixida/Desktop/zhangfeng/device/bacnet-server/internal/protocol/server.go
+          
+我需要查看model包中对象标识符和属性标识符的具体定义，以全面了解BACnet协议中的这些标识符。
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: /Users/caixida/Desktop/zhangfeng/device/bacnet-server/internal/model/objects.go
+          
+### 对象标识符(ObjectIdentifier)
+
+### 定义与结构
+- 在`model/objects.go`中，对象类型`ObjectType`被定义为`uint8`类型的枚举
+- 常见对象类型包括：
+  - `ObjectTypeAnalogInput`、`ObjectTypeAnalogOutput`、`ObjectTypeAnalogValue`
+  - `ObjectTypeBinaryInput`、`ObjectTypeBinaryOutput`、`ObjectTypeBinaryValue`
+  - `ObjectTypeDevice`、`ObjectTypeTrendLog`、`ObjectTypeSchedule`等
+- 对象标识符由两部分组成：对象类型(10位)和对象实例(22位)
+
+#### 编码与解码
+- 在`server.go`中，对象标识符使用4字节表示
+- `parseObjectIdentifier`函数：从字节数组中解析对象标识符，通过位运算提取类型和实例
+- `encodeObjectIdentifier`函数：将对象标识符编码为BACnet格式，类型左移22位与实例合并
+
+### 属性标识符(PropertyIdentifier)
+
+#### 定义与结构
+- 在`model/objects.go`中，`PropertyIdentifier`被定义为`uint32`类型
+- 常见属性标识符包括：
+  - `PropertyIdentifierObjectIdentifier`、`PropertyIdentifierObjectType`
+  - `PropertyIdentifierObjectName`、`PropertyIdentifierPresentValue`
+  - `PropertyIdentifierDescription`、`PropertyIdentifierLocation`等
+
+#### 编码与解码
+- BACnet协议中，属性标识符使用2字节大端序格式编码
+- `parsePropertyIdentifier`函数：从字节数组中解析属性标识符，组合高低字节
+- `encodePropertyIdentifier`函数：将属性标识符编码为2字节大端序格式，确保不超过2字节范围
+
+        
