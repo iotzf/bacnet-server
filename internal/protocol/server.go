@@ -449,7 +449,7 @@ const (
 // handleBACnetAPDU 处理BACnet APDU消息
 func (s *BACnetServer) handleBACnetAPDU(data []byte) ([]byte, error) {
 	// 检查数据长度
-	if len(data) < 4 {
+	if len(data) < 2 {
 		return nil, fmt.Errorf("APDU too short")
 	}
 
@@ -2304,6 +2304,10 @@ func (s *BACnetServer) handleCancelCOVSubscription(data []byte, invokeID byte) (
 
 // createIAmResponse 创建I-Am响应消息
 func (s *BACnetServer) createIAmResponse() []byte {
+	if s.device == nil {
+		return nil
+	}
+
 	// 获取设备信息
 	deviceObjID := s.device.GetObjectIdentifier()
 	deviceID := deviceObjID.Instance

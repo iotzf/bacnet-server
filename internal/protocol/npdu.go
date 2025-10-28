@@ -57,7 +57,7 @@ func ParseNPDU(data []byte) (NPDU, int, error) {
 	}
 
 	// 若剩余足够，尝试解析源网络与源MAC（很多实现不强制存在，仅当足够数据时解析）
-	if len(data)-offset >= 3 {
+	if (npdu.Control&0x80) != 0 && len(data)-offset >= 3 {
 		// SNET(2) + SLEN(1)
 		snet := binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
@@ -76,7 +76,7 @@ func ParseNPDU(data []byte) (NPDU, int, error) {
 	}
 
 	// 如果还有字节，通常是hop count(1)
-	if offset < len(data) {
+	if (npdu.Control&0x20) != 0 && offset < len(data) {
 		h := data[offset]
 		offset++
 		npdu.HopCount = new(byte)

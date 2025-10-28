@@ -67,7 +67,7 @@ func main() {
 	server.Start()
 
 	// 启动数据模拟任务
-	go simulateDataChanges(server)
+	//go simulateDataChanges(server)
 
 	// 设置信号处理以便优雅关闭
 	sigChan := make(chan os.Signal, 1)
