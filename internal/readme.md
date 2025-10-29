@@ -1,3 +1,75 @@
+[TOC]
+
+## 报文格式
+
+### 🧩 一、整体结构关系
+
+BACnet/IP 报文结构如下（自上而下）：
+
+Ethernet Frame
+└── UDP Header (端口 47808 = 0xBAC0)
+└── BVLC (BACnet Virtual Link Control)
+└── NPDU (Network Protocol Data Unit)
+└── APDU (Application Protocol Data Unit)
+
+
+其中：
+- BVLC: IP层封装（BACnet/IP 专用）
+- NPDU: 网络层封装（我们上一步已经实现）
+- APDU: 应用层消息（实际设备通信内容）
+
+### 🧠 二、APDU 基本结构
+
+| 字节偏移 | 字段        | 含义             |
+| ---- | --------- | -------------- |
+| 0    | PDU Type  | 高4位：类型，低4位：标志位 |
+| 1+   | 依类型不同结构变化 |                |
+
+APDU 类型（PDU Type 高4位）
+
+| 类型 | 名称                      | 说明     |
+| -- | ----------------------- | ------ |
+| 0  | Confirmed-Request-PDU   | 带确认请求  |
+| 1  | Unconfirmed-Request-PDU | 不带确认请求 |
+| 2  | Simple-ACK-PDU          | 确认响应   |
+| 3  | Complex-ACK-PDU         | 复杂响应   |
+| 4  | Segment-ACK-PDU         | 分段确认   |
+| 5  | Error-PDU               | 错误响应   |
+| 6  | Reject-PDU              | 拒绝     |
+| 7  | Abort-PDU               | 中止     |
+
+
+### 📦 三、常见 Unconfirmed-Request（无需确认） 类型
+
+| Service Choice | 名称      | 备注 |
+| -------------- | ------- |----|
+| 0x00           | I-Am    |  设备公告自身  |
+| 0x01           | I-Have  |    |
+| 0x08           | Who-Is  |  发现网络设备  |
+| 0x09           | Who-Has |    |
+
+这些是最常见的广播消息。
+
+示例报文（BACnet/IP 层截取）
+
+```text
+01 20 00 0A 01 0B 05 10 08
+```
+前面 `01 20 00 0A 01 0B 05` 是 NPDU, 剩余 `10 08` 是 APDU。
+- 0x10: Unconfirmed Request (0001 0000)
+- 0x08: Service Choice = 8 (Who-Is)
+
+→ 表示一条 Who-Is 请求广播。
+
+
+
+
+
+
+
+
+
+
 ## BACnet中NPDU（网络层协议数据单元）
 
 BACnet中NPDU（网络层协议数据单元）的结构是实现跨网络通信的核心，其字段设计严格定义了数据的路由信息和传输控制规则，确保数据能准确从源设备传至目标设备。
@@ -74,6 +146,32 @@ NPDU的结构按功能可分为**基础字段**和**可选扩展字段**，具�
 │ 源网络地址(2B) │ 源MAC地址(可变) │ 跳数限制(1B) │ 可选扩展字段(按需) │
 └────────────┴──────────────────┴────────────┴──────────────────┘
 ```
+| 字节偏移 | 字段名          | 长度 | 含义                               |
+| ---- | ------------ | -- | -------------------------------- |
+| 0    | Version      | 1  | 固定为 `0x01`（BACnet版本）             |
+| 1    | Control      | 1  | 控制字段，指示是否有 DNET/DADR/SNET/SADR 等 |
+| 2~3  | DNET         | 2  | 目标网络号（仅当 DNET 存在）                |
+| 4    | DLEN         | 1  | 目标MAC地址长度（若 DLEN>0，则接下来是 DADR）   |
+| 5~?  | DADR         | 可变 | 目标MAC地址                          |
+| …    | SNET         | 2  | 源网络号（若有）                         |
+| …    | SLEN         | 1  | 源MAC地址长度                         |
+| …    | SADR         | 可变 | 源MAC地址                           |
+| …    | Hop Count    | 1  | 路由跳数                             |
+| …    | Message Type | 1  | 若为网络层消息（Control 位7=1）才有          |
+| …    | Vendor ID    | 2  | 可选，仅当网络消息类型≥0x80 时存在             |
+| …    | APDU         | 剩余 | 传给上层的应用层数据                       |
+
+
+⚙️ 三、Control 字段结构（1字节）
+
+| 位   | 名称                    | 含义                  |
+| --- | --------------------- | ------------------- |
+| 7   | Network Message Flag  | =1 表示为网络层消息（而非APDU） |
+| 6   | Reserved              | 保留                  |
+| 5   | Destination Specified | 若=1，则存在 DNET/DADR   |
+| 4   | Source Specified      | 若=1，则存在 SNET/SADR   |
+| 3   | Expecting Reply       | 是否期望回应              |
+| 2~0 | Priority              | 优先级 (0~3)           |
 
 
 ### 工程意义

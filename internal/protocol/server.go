@@ -397,20 +397,33 @@ func (s *BACnetServer) processBACnetMessage(data []byte) ([]byte, error) {
 
 // handleOriginalUDPMessage 处理原始UDP消息
 func (s *BACnetServer) handleOriginalUDPMessage(data []byte) ([]byte, error) {
-	_, offset, err := ParseNPDU(data)
+	npdu, offset, err := ParseNPDU(data)
 	if err != nil {
 		return nil, err
 	}
-	return s.handleBACnetAPDU(data[offset:])
+
+	if npdu.Control.NetworkMessageFlag {
+		// 处理网络消息
+		return nil, errors.New("network messages not supported yet")
+	} else {
+		return s.handleBACnetAPDU(data[offset:])
+	}
 }
 
 // handleBroadcastMessage 处理广播消息
 func (s *BACnetServer) handleBroadcastMessage(data []byte) ([]byte, error) {
-	_, offset, err := ParseNPDU(data)
+	npdu, offset, err := ParseNPDU(data)
 	if err != nil {
 		return nil, err
 	}
-	return s.handleBACnetAPDU(data[offset:])
+	fmt.Printf("NPDU: %+v\n", npdu.Control.String())
+
+	if npdu.Control.NetworkMessageFlag {
+		// 处理网络消息
+		return nil, errors.New("network messages not supported yet")
+	} else {
+		return s.handleBACnetAPDU(data[offset:])
+	}
 }
 
 // 错误类型常量

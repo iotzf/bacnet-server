@@ -91,12 +91,12 @@ func ParseAPDU(data []byte) (*APDU, error) {
 		return result, nil
 
 	case BACnetAPDUTypeUnconfirmedServiceRequest:
-		// 需要至少 2 字节 (octet0, serviceChoice)
+		// 需要至少 2 字节 (octet0, serviceChoice) Who-Is Who-Has I-Have I-Am
 		if len(data) < 2 {
 			return nil, fmt.Errorf("unconfirmed service too short: %d", len(data))
 		}
 		sc := data[1]
-		result.ServiceChoice = &sc
+		result.ServiceChoice = &sc // 0x00:"I-Am" 0x08:"Who-Is" 0x09:"Who-Has"
 		if len(data) > 2 {
 			result.Payload = data[2:]
 		} else {
@@ -133,6 +133,8 @@ func ParseAPDU(data []byte) (*APDU, error) {
 		}
 		return result, nil
 
+	case BACnetAPDUTypeSegmentAck:
+
 	case BACnetAPDUTypeError:
 		// 常见格式：octet0, octet1, octet2(invokeID), octet3(len), octet4(serviceChoice), octet5..error data
 		if len(data) < 5 {
@@ -147,6 +149,10 @@ func ParseAPDU(data []byte) (*APDU, error) {
 		}
 		return result, nil
 
+	case BACnetAPDUTypeReject:
+
+	case BACnetAPDUTypeAbort:
+
 	default:
 		// 未知或未实现的 PDU 类型，填充原始负载返回给调用者进一步处理
 		if len(data) > 1 {
@@ -156,6 +162,8 @@ func ParseAPDU(data []byte) (*APDU, error) {
 		}
 		return result, nil
 	}
+
+	return result, nil
 }
 
 // pduTypeName 返回 PDU 类型可读名称
